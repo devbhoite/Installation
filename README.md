@@ -67,7 +67,7 @@ git --version
 
 git config --global user.name "Devendra_Bhoite"
 
-git config --global user.email "dev_bhoite@yahoo.co.in"
+git config --global user.email "email_id"
 
 git config --list
 
