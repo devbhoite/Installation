@@ -1,0 +1,142 @@
+
+Full Project: Ansible Master Project
+Project Structure
+ansible-project/
+├── inventory
+├── site.yml
+├── group_vars/
+│   ├── dev.yml
+│   ├── qa.yml
+│   └── prod.yml
+├── roles/
+│   ├── web/
+│   │   ├── tasks/main.yml
+│   │   ├── handlers/main.yml
+│   │   └── templates/index.html.j2
+│   ├── users/
+│   │   └── tasks/main.yml
+│   └── patch/
+│       └── tasks/main.yml
+
+1️⃣ Inventory (inventory)
+[dev]
+dev1 ansible_host=172.31.10.10 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/pre-key.pem
+
+[qa]
+qa1 ansible_host=172.31.10.20 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/pre-key.pem
+
+[prod]
+prod1 ansible_host=172.31.10.30 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/pre-key.pem
+prod2 ansible_host=172.31.10.31 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/pre-key.pem
+
+2️⃣ Group Variables (group_vars/dev.yml, qa.yml, prod.yml)
+dev.yml
+env: dev
+app_message: "Welcome to Development Environment"
+users:
+  - name: devops
+    groups: sudo
+    shell: /bin/bash
+
+qa.yml
+env: qa
+app_message: "Welcome to QA Environment"
+users:
+  - name: qauser
+    groups: sudo
+    shell: /bin/bash
+
+prod.yml
+env: prod
+app_message: "Welcome to PROD Environment"
+users:
+  - name: produser
+    groups: sudo
+    shell: /bin/bash
+
+3️⃣ Role: Web Deployment (roles/web/tasks/main.yml)
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+  notify: restart nginx
+
+- name: Deploy web page template
+  template:
+    src: index.html.j2
+    dest: /var/www/html/index.html
+
+Handler (roles/web/handlers/main.yml)
+- name: restart nginx
+  service:
+    name: nginx
+    state: restarted
+
+Template (roles/web/templates/index.html.j2)
+<h1>{{ app_message }}</h1>
+<p>Server: {{ ansible_hostname }}</p>
+
+4️⃣ Role: User Management (roles/users/tasks/main.yml)
+- name: Create users
+  user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups }}"
+    shell: "{{ item.shell }}"
+    state: present
+  loop: "{{ users }}"
+
+- name: Add SSH keys for users
+  authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ lookup('file', item.name + '.pub') }}"
+  loop: "{{ users }}"
+
+
+Ensure you have public key files like devops.pub in the project folder.
+
+5️⃣ Role: Patch Management (roles/patch/tasks/main.yml)
+- name: Upgrade all packages
+  apt:
+    upgrade: dist
+    update_cache: yes
+
+- name: Check if reboot is required
+  shell: test -f /var/run/reboot-required
+  register: reboot_required
+  ignore_errors: yes
+
+- name: Reboot if required
+  reboot:
+  when: reboot_required.rc == 0
+
+6️⃣ Main Playbook (site.yml)
+- hosts: all
+  become: yes
+  roles:
+    - web
+    - users
+    - patch
+
+7️⃣ How to Run
+1. Check connectivity
+ansible -i inventory all -m ping
+
+2. Syntax check
+ansible-playbook -i inventory site.yml --syntax-check
+
+3. Dry run
+ansible-playbook -i inventory site.yml --check
+
+4. Run playbook
+ansible-playbook -i inventory site.yml -v
+
+8️⃣ Verification
+Web
+ansible -i inventory all -m shell -a "curl -s http://localhost"
+
+Users
+ansible -i inventory all -m shell -a "id devops"
+
+Patch / Reboot
+ansible -i inventory all -m shell -a "uptime"
